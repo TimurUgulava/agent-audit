@@ -1,0 +1,14 @@
+# секреты и сессии — никогда не коммитить
+.env
+*.session
+*.session-journal
+
+# рабочие файлы
+__pycache__/
+*.pyc
+*.skill
+docs/audits/
+*.jsonl
+
+# macOS
+.DS_Store
