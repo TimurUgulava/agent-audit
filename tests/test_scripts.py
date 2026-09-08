@@ -160,16 +160,25 @@ class DriveTest(unittest.TestCase):
         self.assertIn('ts', first)
 
     def test_client_without_credentials_fails_cleanly(self):
-        import os
-        saved = {k: os.environ.pop(k, None) for k in ('TG_API_ID', 'TG_API_HASH')}
-        try:
-            with self.assertRaises(SystemExit) as ctx:
-                self.drive.get_client()
-            self.assertIn('TG_API_ID', str(ctx.exception))
-        finally:
-            for k, v in saved.items():
-                if v is not None:
-                    os.environ[k] = v
+        with self.assertRaises(SystemExit) as ctx:
+            self.drive.get_client(env={}, config_path=str(self.root / 'none.env'), use_keyring=False)
+        self.assertIn('setup_telegram.py', str(ctx.exception))
+
+    def test_flood_guard_waits_short_and_stops_on_long(self):
+        class Flood(Exception):
+            def __init__(self, seconds):
+                self.seconds = seconds
+        calls = []
+        def short():
+            calls.append(1)
+            if len(calls) == 1:
+                raise Flood(0)
+            return 'ok'
+        self.assertEqual(self.drive.with_flood_guard(short, 'x'), 'ok')
+        with self.assertRaises(SystemExit):
+            self.drive.with_flood_guard(lambda: (_ for _ in ()).throw(Flood(999)), 'x')
+        with self.assertRaises(ValueError):
+            self.drive.with_flood_guard(lambda: (_ for _ in ()).throw(ValueError('boom')), 'x')
 
     def test_bot_flag_required_without_telethon(self):
         result = subprocess.run([sys.executable, str(SCRIPTS / 'tg_drive.py'), 'read'],
@@ -177,6 +186,64 @@ class DriveTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('--bot', result.stderr)
         self.assertNotIn('Traceback', result.stderr)
+
+
+class AuthTest(unittest.TestCase):
+    """Учётные данные Telegram: порядок источников, права файла, маска, мастер без секретов."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('_tg_auth', SCRIPTS / '_tg_auth.py')
+        cls.auth = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.auth)
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = pathlib.Path(self.tmp.name)
+
+    def test_env_file_written_private_and_read_back(self):
+        import os, stat
+        path = self.root / 'telegram.env'
+        self.auth.write_env_file(str(path), {'TG_API_ID': '123', 'TG_API_HASH': 'abcdef0123'})
+        self.auth.write_env_file(str(path), {'TG_SESSION': '/tmp/s.session'})
+        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+        values = self.auth.read_env_file(str(path))
+        self.assertEqual(values['TG_API_ID'], '123')
+        self.assertEqual(values['TG_API_HASH'], 'abcdef0123')
+        self.assertEqual(values['TG_SESSION'], '/tmp/s.session')
+
+    def test_resolution_order_env_over_file(self):
+        path = self.root / 'telegram.env'
+        self.auth.write_env_file(str(path), {'TG_API_ID': '1', 'TG_API_HASH': 'file-hash'})
+        creds = self.auth.resolve_credentials(env={'TG_API_ID': '2'}, config_path=str(path), use_keyring=False)
+        self.assertEqual(creds['api_id'], '2')
+        self.assertEqual(creds['sources']['api_id'], 'окружение')
+        self.assertEqual(creds['api_hash'], 'file-hash')
+        self.assertEqual(creds['sources']['api_hash'], str(path))
+        self.assertEqual(creds['session'], self.auth.DEFAULT_SESSION)
+        empty = self.auth.resolve_credentials(env={}, config_path=str(self.root / 'no.env'), use_keyring=False)
+        self.assertIsNone(empty['api_id'])
+
+    def test_mask_never_reveals_secret(self):
+        self.assertEqual(self.auth.mask(None), '—')
+        self.assertNotIn('abcdef', self.auth.mask('abcdef0123456789'))
+        self.assertEqual(self.auth.mask('123'), '•••')
+
+    def test_setup_help_and_check_without_credentials(self):
+        import os
+        env = {k: v for k, v in os.environ.items() if not k.startswith('TG_')}
+        env['AGENT_AUDIT_HOME'] = str(self.root)
+        result = subprocess.run([sys.executable, str(SCRIPTS / 'setup_telegram.py'), '--help'],
+                                text=True, capture_output=True, env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('setup', result.stdout)
+        result = subprocess.run([sys.executable, str(SCRIPTS / 'setup_telegram.py'), 'check'],
+                                text=True, capture_output=True, env=env)
+        self.assertNotIn('Traceback', result.stderr)
+        self.assertIn('api_id', result.stdout)
+        self.assertNotIn('TG_API_HASH=', result.stdout)
 
 
 if __name__ == '__main__':

@@ -4,10 +4,9 @@
 
 Пишет ТОЛЬКО названному боту: сущность без признака bot отвергается, людям и чатам
 писать нельзя. Авторизация — согласованный план прогона текущей ревизии.
-Нужен Telethon >= 1.44 (`pip install telethon`). Учётные данные приложения — переменные
-окружения TG_API_ID и TG_API_HASH (my.telegram.org); файл сессии — TG_SESSION или --session
-(по умолчанию ~/.agent-audit/tg-drive.session). При первом запуске Telethon спросит телефон
-и код входа; дальше сессия переиспользуется. Секреты не передаются аргументами и не печатаются.
+Транспорт настраивается мастером scripts/setup_telegram.py (references/telegram-setup.md):
+api_id/api_hash — окружение TG_API_ID/TG_API_HASH, keyring или ~/.agent-audit/telegram.env;
+сессия — TG_SESSION, тот же файл или ~/.agent-audit/tg-drive.session. Секреты не печатаются.
 
   tg_drive.py --bot @имя read [N]
   tg_drive.py --bot @имя send "<текст>" [--wait S] [--total S]
@@ -16,9 +15,10 @@
 Общие флаги: --transcript файл.jsonl (дописывать запись каждого шага — источник live),
 --session путь (файл сессии Telethon).
 
-Rich-сообщения бота (sendRichMessage) Telethon не разбирает: полный текст читай в точке
-чтения из карты (база, лог, экспорт). Ожидание: --wait секунд тишины после последнего
-изменения, но не дольше --total.
+Против ограничения аккаунта: пауза не меньше двух секунд между действиями даже из разных
+процессов, опрос чата раз в 3–6 секунд, FloodWait до двух минут выдерживается, дольше —
+остановка без повторов. Rich-сообщения бота Telethon не разбирает: полный текст читай в
+точке чтения из карты. Ожидание: --wait секунд тишины, но не дольше --total.
 """
 import argparse
 import datetime as dt
@@ -27,23 +27,32 @@ import os
 import sys
 import time
 
-DEFAULT_SESSION = os.path.expanduser("~/.agent-audit/tg-drive.session")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _tg_auth as auth  # noqa: E402
+
+POLL_FAST, POLL_SLOW, SLOW_AFTER = 3, 6, 60
 
 
-def get_client(session=None):
-    """Telethon-клиент из переменных окружения; без них — понятный отказ, не трейсбек."""
-    api_id = os.environ.get("TG_API_ID")
-    api_hash = os.environ.get("TG_API_HASH")
-    if not api_id or not api_hash:
-        raise SystemExit("задай TG_API_ID и TG_API_HASH (my.telegram.org) в окружении; "
-                         "сессия — TG_SESSION или --session")
+def get_client(session=None, env=None, config_path=auth.CONFIG_FILE, use_keyring=True):
+    """Клиент по учётным данным из окружения/keyring/файла; без них — понятный отказ."""
+    creds = auth.resolve_credentials(env=env, config_path=config_path, use_keyring=use_keyring)
+    return auth.make_client(creds, session)
+
+
+def with_flood_guard(action, what):
+    """Выполнить действие; FloodWait до лимита выждать один раз, дольше — остановиться."""
     try:
-        from telethon.sync import TelegramClient
-    except ImportError:
-        raise SystemExit("нужен Telethon >= 1.44: pip install telethon")
-    session = session or os.environ.get("TG_SESSION") or DEFAULT_SESSION
-    os.makedirs(os.path.dirname(os.path.abspath(session)), exist_ok=True)
-    return TelegramClient(session, int(api_id), api_hash)
+        return action()
+    except Exception as exc:  # FloodWaitError импортировать без Telethon нельзя
+        seconds = auth.flood_wait_seconds(exc)
+        if seconds is None:
+            raise
+        if seconds > auth.FLOOD_WAIT_CAP:
+            raise SystemExit(f"Telegram просит подождать {seconds} с перед «{what}» — прогон "
+                             "остановлен; не повторяй команду, отметь в транскрипте")
+        print(f"… Telegram просит подождать {seconds} с — жду")
+        time.sleep(seconds + 1)
+        return action()
 
 
 def fmt(m):
@@ -110,7 +119,7 @@ def wait_new(client, entity, after_id, quiet, total=600):
     last_change = start
     first = None
     while time.time() - start < total:
-        msgs = list(client.iter_messages(entity, min_id=after_id, limit=30))
+        msgs = with_flood_guard(lambda: list(client.iter_messages(entity, min_id=after_id, limit=30)), "чтение")
         snapshot = {m.id: (m.message, m.edit_date) for m in msgs}
         if snapshot != seen:
             if not seen and snapshot:
@@ -119,7 +128,7 @@ def wait_new(client, entity, after_id, quiet, total=600):
             last_change = time.time()
         elif seen and time.time() - last_change >= quiet:
             break
-        time.sleep(2)
+        time.sleep(POLL_SLOW if time.time() - start > SLOW_AFTER else POLL_FAST)
     msgs = list(reversed(list(client.iter_messages(entity, min_id=after_id, limit=30))))
     return msgs, first
 
@@ -128,8 +137,8 @@ def build_parser():
     ap = argparse.ArgumentParser(description="Живой прогон бота в Telegram (agent-audit)")
     ap.add_argument("--bot", required=True, help="@username бота — единственный адресат")
     ap.add_argument("--transcript", help="JSONL-файл транскрипта (дописывается)")
-    ap.add_argument("--session", help="файл сессии Telethon (иначе TG_SESSION или "
-                    + DEFAULT_SESSION + ")")
+    ap.add_argument("--session", help="файл сессии Telethon (иначе TG_SESSION, файл настроек "
+                    "или " + auth.DEFAULT_SESSION + ")")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("read"); r.add_argument("n", nargs="?", type=int, default=10)
     for name in ("send", "click", "wait"):
@@ -154,9 +163,10 @@ def main(argv=None):
             msgs = list(reversed(list(client.iter_messages(entity, limit=a.n))))
             show(msgs)
             return
+        auth.pace()
         t0 = time.time()
         if a.cmd == "send":
-            sent = client.send_message(entity, a.text)
+            sent = with_flood_guard(lambda: client.send_message(entity, a.text), "отправка")
             print(f"→ отправил [{sent.id}]: {a.text[:80]}")
             msgs, first = wait_new(client, entity, sent.id, a.wait, a.total)
             record = {"cmd": "send", "input": a.text, "sent_id": sent.id}
@@ -169,7 +179,7 @@ def main(argv=None):
                 raise SystemExit("кнопка не найдена: " +
                                  " | ".join(b.text for row in msg.buttons for b in row))
             last = client.get_messages(entity, limit=1)[0].id
-            res = msg.click(text=target.text)
+            res = with_flood_guard(lambda: msg.click(text=target.text), "нажатие")
             note = getattr(res, "message", "") or ""
             print(f"→ нажал «{target.text}» на [{msg.id}]; ответ: {note}")
             after = last - 1 if last > msg.id else msg.id
