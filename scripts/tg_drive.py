@@ -134,15 +134,20 @@ def wait_new(client, entity, after_id, quiet, total=600):
 
 
 def build_parser():
-    ap = argparse.ArgumentParser(description="Живой прогон бота в Telegram (agent-audit)")
+    # --transcript и --session принимаются и до, и после подкоманды
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--transcript", default=argparse.SUPPRESS,
+                        help="JSONL-файл транскрипта (дописывается)")
+    common.add_argument("--session", default=argparse.SUPPRESS,
+                        help="файл сессии Telethon (иначе TG_SESSION, файл настроек или "
+                        + auth.DEFAULT_SESSION + ")")
+    ap = argparse.ArgumentParser(description="Живой прогон бота в Telegram (agent-audit)",
+                                 parents=[common])
     ap.add_argument("--bot", required=True, help="@username бота — единственный адресат")
-    ap.add_argument("--transcript", help="JSONL-файл транскрипта (дописывается)")
-    ap.add_argument("--session", help="файл сессии Telethon (иначе TG_SESSION, файл настроек "
-                    "или " + auth.DEFAULT_SESSION + ")")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    r = sub.add_parser("read"); r.add_argument("n", nargs="?", type=int, default=10)
+    r = sub.add_parser("read", parents=[common]); r.add_argument("n", nargs="?", type=int, default=10)
     for name in ("send", "click", "wait"):
-        p = sub.add_parser(name)
+        p = sub.add_parser(name, parents=[common])
         if name == "send":
             p.add_argument("text")
         elif name == "click":
@@ -157,7 +162,13 @@ def build_parser():
 def main(argv=None):
     a = build_parser().parse_args(argv)
     bot = a.bot.lstrip("@")
-    with get_client(a.session) as client:
+    transcript = getattr(a, "transcript", None)
+    client = get_client(getattr(a, "session", None))
+    client.connect()   # без start(): вход не должен идти через ассистента
+    try:
+        if not client.is_user_authorized():
+            raise SystemExit("сессия не авторизована — выполни в своём терминале "
+                             "`python3 scripts/setup_telegram.py` (references/telegram-setup.md)")
         entity = ensure_bot(client.get_entity(bot), a.bot)
         if a.cmd == "read":
             msgs = list(reversed(list(client.iter_messages(entity, limit=a.n))))
@@ -195,7 +206,9 @@ def main(argv=None):
             "first_response_s": first,
             "waited_s": round(time.time() - t0, 1),
         })
-        append_transcript(a.transcript, record)
+        append_transcript(transcript, record)
+    finally:
+        client.disconnect()
 
 
 if __name__ == "__main__":

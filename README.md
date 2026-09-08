@@ -163,7 +163,7 @@ Rich-сообщения некоторых ботов Telethon не разбир
 
 ## Что нужно
 
-**Обязательно:** Claude Code и Python 3.8+. Скрипты карты и журнала используют только
+**Обязательно:** Claude Code и Python 3.9+. Скрипты карты и журнала используют только
 стандартную библиотеку.
 
 **Для живого прогона Telegram-бота:** Telethon 1.44 или новее и ваш аккаунт Telegram.
@@ -189,7 +189,7 @@ python3 scripts/setup_telegram.py check
 
 ```bash
 git clone https://github.com/TimurUgulava/agent-audit.git ~/.claude/skills/agent-audit
-cp ~/.claude/skills/agent-audit/references/roles/*.md ~/.claude/agents/
+mkdir -p ~/.claude/agents && cp ~/.claude/skills/agent-audit/references/roles/*.md ~/.claude/agents/
 ```
 
 Новые типы агентов Claude Code подхватывает в следующей сессии. Проверка скриптов:
@@ -268,6 +268,7 @@ agent-audit/
 │   ├── hole-catalog.md               # именованные паттерны дыр с прецедентами
 │   ├── families/01…08-*.md           # восемь семейств: что проверять, где искать, лечения
 │   ├── inspector-brief.md            # задание инспектору и формат находки
+│   ├── examples.md                   # образцы карточек: дефект, улучшение, визуальный пробел
 │   ├── report-template.md            # отчёт и совместимый журнал
 │   └── roles/                        # субагенты: инспектор и судья
 ├── scripts/

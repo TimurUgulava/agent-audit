@@ -174,11 +174,24 @@ class DriveTest(unittest.TestCase):
             if len(calls) == 1:
                 raise Flood(0)
             return 'ok'
-        self.assertEqual(self.drive.with_flood_guard(short, 'x'), 'ok')
+        import contextlib, io
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(self.drive.with_flood_guard(short, 'x'), 'ok')
         with self.assertRaises(SystemExit):
             self.drive.with_flood_guard(lambda: (_ for _ in ()).throw(Flood(999)), 'x')
         with self.assertRaises(ValueError):
             self.drive.with_flood_guard(lambda: (_ for _ in ()).throw(ValueError('boom')), 'x')
+
+    def test_transcript_and_session_accepted_after_subcommand(self):
+        a = self.drive.build_parser().parse_args(
+            ['--bot', '@b', 'send', 'привет', '--wait', '5', '--transcript', 't.jsonl', '--session', 's'])
+        self.assertEqual(a.transcript, 't.jsonl')
+        self.assertEqual(a.session, 's')
+        b = self.drive.build_parser().parse_args(['--transcript', 'x.jsonl', '--bot', '@b', 'read'])
+        self.assertEqual(b.transcript, 'x.jsonl')
+        self.assertIsNone(getattr(b, 'session', None))
+        c = self.drive.build_parser().parse_args(['--bot', '@b', 'wait', '10'])
+        self.assertIsNone(getattr(c, 'transcript', None))
 
     def test_bot_flag_required_without_telethon(self):
         result = subprocess.run([sys.executable, str(SCRIPTS / 'tg_drive.py'), 'read'],

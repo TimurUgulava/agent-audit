@@ -10,10 +10,21 @@
 
 ## [Не выпущено]
 
+## [2.2.1] — 2026-09-08
+
+Полировка по независимой проверке репозитория глазами стороннего пользователя.
+
 ### Исправлено
 
+- `tg_drive.py` принимает `--transcript` и `--session` и до, и после подкоманды: пример
+  из README раньше падал на «unrecognized arguments».
+- `tg_drive.py` не начинает интерактивный вход при неавторизованной сессии, а отсылает к
+  мастеру: код входа не должен проходить через ассистента.
 - Мастер сохраняет ключи, пришедшие из переменных окружения, чтобы следующий запуск без них
   не упёрся в «нет учётных данных».
+- README: минимальная версия Python 3.9 (скрипты используют `ast.unparse`), `mkdir -p` перед
+  копированием ролей субагентов, `examples.md` в структуре. Карта: два раздела с номером 10
+  разведены. Описание скилла без ссылок на приватные скиллы автора.
 
 ## [2.2.0] — 2026-09-08
 
@@ -137,6 +148,7 @@ Telethon, и живой прогон раньше упирался в «нет �
   со стороны.
 - `extract_promises.py` — корпус обещаний из кода бота; `ledger.py` — журнал.
 
-[Не выпущено]: https://github.com/TimurUgulava/agent-audit/compare/v2.2.0...HEAD
+[Не выпущено]: https://github.com/TimurUgulava/agent-audit/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/TimurUgulava/agent-audit/releases/tag/v2.2.1
 [2.2.0]: https://github.com/TimurUgulava/agent-audit/releases/tag/v2.2.0
 [2.1.0]: https://github.com/TimurUgulava/agent-audit/releases/tag/v2.1.0
