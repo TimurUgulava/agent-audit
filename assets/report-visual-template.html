@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{Имя агента}} — ревизия {{дата}}</title>
+<style>
+  :root{--paper:#F3F5F7;--card:#FFFFFF;--ink:#1E2430;--ink2:#4B5563;--ink3:#7B8794;--rule:#D9DEE5;
+    --accent:#1F6FB2;--accent-soft:#E3EEF8;--ok:#2F7A4A;--ok-soft:#E2F1E6;--warn:#A9690A;--warn-soft:#FBF0D9;
+    --crit:#B3261E;--crit-soft:#F9E1DF;--mute:#6B7280;--mute-soft:#E5E7EB}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#151A21;--card:#1D2430;--ink:#E8ECF1;
+    --ink2:#B7C0CC;--ink3:#8A95A3;--rule:#2E3743;--accent:#7FB3E6;--accent-soft:#1E3247;--ok:#7CC791;--ok-soft:#1C3324;
+    --warn:#E0B25A;--warn-soft:#3A2E13;--crit:#F08B84;--crit-soft:#3F1F1D;--mute:#9CA3AF;--mute-soft:#2B3340}}
+  :root[data-theme="dark"]{--paper:#151A21;--card:#1D2430;--ink:#E8ECF1;--ink2:#B7C0CC;--ink3:#8A95A3;--rule:#2E3743;
+    --accent:#7FB3E6;--accent-soft:#1E3247;--ok:#7CC791;--ok-soft:#1C3324;--warn:#E0B25A;--warn-soft:#3A2E13;
+    --crit:#F08B84;--crit-soft:#3F1F1D;--mute:#9CA3AF;--mute-soft:#2B3340}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  main{max-width:860px;margin:0 auto;padding:28px 18px 60px}
+  h1{font-size:28px;line-height:1.2;margin:0 0 6px}
+  h2{font-size:20px;margin:36px 0 12px}
+  .lede{color:var(--ink2);margin:0 0 18px}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:18px 20px;margin:12px 0}
+  .verdict{border-left:6px solid var(--warn)}
+  .verdict.ok{border-left-color:var(--ok)}.verdict.crit{border-left-color:var(--crit)}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .tile{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:14px 16px}
+  .tile .n{font-size:30px;font-weight:700;line-height:1.1}
+  .tile .l{font-size:13px;color:var(--ink3);margin-top:4px}
+  .tag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;vertical-align:middle}
+  .s0,.s1{background:var(--crit-soft);color:var(--crit)}.s2{background:var(--warn-soft);color:var(--warn)}
+  .s3{background:var(--accent-soft);color:var(--accent)}.good{background:var(--ok-soft);color:var(--ok)}
+  .na{background:var(--mute-soft);color:var(--mute)}
+  .finding h3{margin:0 0 8px;font-size:18px}
+  .finding dl{display:grid;grid-template-columns:130px 1fr;gap:4px 14px;margin:0}
+  .finding dt{color:var(--ink3);font-size:14px;padding-top:2px}.finding dd{margin:0}
+  .small{font-size:13px;color:var(--ink3)}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink3)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.crit{background:var(--crit)}.dot.na{background:var(--mute)}
+  ul{padding-left:20px}li{margin:4px 0}
+  a{color:var(--accent)}
+  .wrap{overflow-x:auto}
+  @media (max-width:480px){.finding dl{grid-template-columns:1fr}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<main>
+  <h1>{{Имя агента}}: что показала ревизия</h1>
+  <p class="lede">{{Дата}} · {{режим: первая / повторная / дифф}} · глубина: {{по коду / по коду и стенду / с живым прогоном}} · {{независимая проверка была / не было}}</p>
+
+  <section class="card verdict {{ok|crit|(пусто = жёлтый)}}">
+    <h2 style="margin-top:0">Можно ли доверять</h2>
+    <p>{{Каким задачам агент готов. Где нужен присмотр. Что блокирует. Три-пять предложений простыми словами.}}</p>
+    <p class="small">Это заключение по проверенной выборке, не гарантия. Границы — в разделе «Что не проверено».</p>
+  </section>
+
+  <h2>Что проверяли</h2>
+  <div class="tiles">
+    <div class="tile"><div class="n">{{N}}</div><div class="l">сквозных сценариев</div></div>
+    <div class="tile"><div class="n">{{N}}</div><div class="l">прогнано вживую</div></div>
+    <div class="tile"><div class="n">{{N}}</div><div class="l">находок, из них {{N}} существенных</div></div>
+    <div class="tile"><div class="n">{{N}}</div><div class="l">закрыто в ходе ревизии</div></div>
+  </div>
+
+  <h2>Главное</h2>
+  <!-- до пяти находок; серьёзность словами; AA-id мелким шрифтом -->
+  <article class="card finding">
+    <h3>{{Что случится с человеком, одной фразой}} <span class="tag s1">существенно</span></h3>
+    <dl>
+      <dt>Почему</dt><dd>{{Причина простыми словами; термин объяснён в скобках.}}</dd>
+      <dt>Что сделать</dt><dd>{{Конкретное изменение и как проверить, что помогло.}}</dd>
+      <dt>Статус</dt><dd>{{открыто / закрыто в ходе ревизии}}</dd>
+    </dl>
+    <p class="small">{{AA-000}} · {{сценарий}} · доказательство: {{по коду / в прогоне / снимок}}</p>
+  </article>
+
+  <h2>Карта сценариев</h2>
+  <div class="card wrap">
+    <table>
+      <tr><th>Сценарий</th><th>Итог</th><th>Комментарий</th></tr>
+      <tr><td>{{Новичок пишет первый раз}}</td><td><span class="dot ok"></span>работает</td><td>{{…}}</td></tr>
+      <tr><td>{{…}}</td><td><span class="dot warn"></span>с оговорками</td><td>{{…}}</td></tr>
+      <tr><td>{{…}}</td><td><span class="dot crit"></span>не работает</td><td>{{…}}</td></tr>
+      <tr><td>{{…}}</td><td><span class="dot na"></span>не проверено</td><td>{{почему}}</td></tr>
+    </table>
+  </div>
+
+  <h2>Что хорошо</h2>
+  <div class="card"><ul>
+    <li>{{Проверенная сильная сторона, которую стоит сохранить при исправлении.}}</li>
+  </ul></div>
+
+  <h2>Что не проверено и почему</h2>
+  <div class="card"><ul>
+    <li>{{Пробел}} — {{причина}} — {{как закрыть}}</li>
+  </ul></div>
+
+  <h2>Что дальше</h2>
+  <div class="card">
+    <ol>
+      <li><span class="tag s1">сначала</span> {{блокирующее и существенное}}</li>
+      <li><span class="tag s2">потом</span> {{улучшения}}</li>
+      <li><span class="tag s3">полировка</span> {{мелочи}}</li>
+    </ol>
+    <p><b>Нужно решить владельцу:</b></p>
+    <ul><li>{{Развилка}} — вариант А {{…}} / вариант Б {{…}}</li></ul>
+  </div>
+
+  <h2>Ссылки</h2>
+  <p class="small">Полный отчёт: {{docs/audits/YYYY-MM-DD.md}} · журнал: {{docs/audits/ledger.md}} · карта: {{docs/audits/map.md}} · план и транскрипт прогона: {{…}}</p>
+</main>
+</body>
+</html>
