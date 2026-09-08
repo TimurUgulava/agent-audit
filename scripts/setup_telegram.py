@@ -64,6 +64,8 @@ def cmd_setup(a):
         print(f"Учётные данные уже есть (api_id {auth.mask(creds['api_id'])}, "
               f"источник: {creds['sources']['api_id']}). Заменить — запусти с --reset.")
         api_id, api_hash = creds["api_id"], creds["api_hash"]
+        if creds["sources"]["api_id"] == "окружение":
+            print("Сохранено на будущее в:", store_credentials(api_id, api_hash))
     else:
         api_id = ask("api_id: ")
         if not api_id.isdigit():
